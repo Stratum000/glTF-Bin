@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <Version>1.0</Version>
+    <Title>glTF-GhConverter</Title>
+    <Description>Convert a Grasshopper mesh to glTF</Description>
+    <TargetExt>.gha</TargetExt>
+  </PropertyGroup>
+	
+  <ItemGroup>
+    <Compile Include="..\glTF-BinExporter\Constants.cs" Link="Constants.cs" />
+    <Compile Include="..\glTF-BinExporter\glTFBinExporterPlugin.cs" Link="glTFBinExporterPlugin.cs" />
+    <Compile Include="..\glTF-BinExporter\GlTFExporterCommand.cs" Link="GlTFExporterCommand.cs" />
+    <Compile Include="..\glTF-BinExporter\glTFExportOptions.cs" Link="glTFExportOptions.cs" />
+    <Compile Include="..\glTF-BinExporter\glTFExportOptionsDialog.cs" Link="glTFExportOptionsDialog.cs" />
+    <Compile Include="..\glTF-BinExporter\gltfSchemaDummy.cs" Link="gltfSchemaDummy.cs" />
+    <Compile Include="..\glTF-BinExporter\gltfSchemaSceneDummy.cs" Link="gltfSchemaSceneDummy.cs" />
+    <Compile Include="..\glTF-BinExporter\GlTFUtils.cs" Link="GlTFUtils.cs" />
+    <Compile Include="..\glTF-BinExporter\RhinoDocGltfConverter.cs" Link="RhinoDocGltfConverter.cs" />
+    <Compile Include="..\glTF-BinExporter\RhinoMaterialGltfConverter.cs" Link="RhinoMaterialGltfConverter.cs" />
+    <Compile Include="..\glTF-BinExporter\RhinoMeshGltfConverter.cs" Link="RhinoMeshGltfConverter.cs" />
+    <Compile Include="..\glTF-BinExporter\Selection.cs" Link="Selection.cs" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Grasshopper" Version="7.7.21160.5001" IncludeAssets="compile;build" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\glTFExtensions\glTFExtensions.csproj" />
+    <ProjectReference Include="..\glTFLib\glTF-CSharp-Loader\glTFLoader\glTFLoader.csproj" />
+  </ItemGroup>
+  
+  <PropertyGroup Condition="$(Configuration) == 'Debug' AND $([MSBuild]::IsOSPlatform(Windows))">
+    <StartProgram>C:\Program Files\Rhino 7\System\Rhino.exe</StartProgram>
+    <StartArguments></StartArguments>
+    <StartAction>Program</StartAction>
+  </PropertyGroup>
+
+</Project>

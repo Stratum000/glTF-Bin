@@ -5,7 +5,7 @@ using System.Drawing;
 
 namespace GhGltfConverter
 {
-    public class GhGltfConverterInfo : GH_AssemblyInfo
+    public class glTfGhConverterInfo : GH_AssemblyInfo
     {
         public override string Name => "GhGltfConverter";
 
