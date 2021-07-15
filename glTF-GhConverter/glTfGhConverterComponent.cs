@@ -24,8 +24,8 @@ namespace GhGltfConverter
         /// </summary>
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
-            pManager.AddMeshParameter("Mesh", "M", "Mesh to be converted", GH_ParamAccess.item);
-            pManager.AddBooleanParameter("Draco", "D", "Draco compression", GH_ParamAccess.item, true);
+            pManager.AddMeshParameter("Meshes", "M", "Meshes to be converted", GH_ParamAccess.list);
+            pManager.AddBooleanParameter("Draco", "D", "Draco compression", GH_ParamAccess.item, false);
         }
 
         /// <summary>
@@ -44,23 +44,26 @@ namespace GhGltfConverter
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             // retrieve all data from the input parameters.
-            Mesh mesh = null;
+            List<Mesh> meshes = new List<Mesh>();
             bool doDraco = true;
             string glTFtext;
 
-            // When data cannot be extracted from a parameter, we should abort this method.
-            if (!DA.GetData(0, ref mesh)) return;
-            if (!DA.GetData(1, ref doDraco)) return;
-
-            // pattern for input validation, if required
-            //    AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "error message here");
-            //    return;
-            //}
+            // When data cannot be extracted from a parameter, abort.
+            if (!DA.GetDataList(0, meshes))
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to get Meshes input");
+                return;
+            }
+            if (!DA.GetData(1, ref doDraco))
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to get Draco input");
+                return;
+            }
 
             // the converter wants a Rhino doc
             RhinoDoc rhinoDoc = RhinoDoc.Create(null);
-            rhinoDoc.Objects.AddMesh(mesh);
-            
+            meshes.ForEach(m => rhinoDoc.Objects.AddMesh(m));
+
             glTFExportOptions opts = new glTFExportOptions();
             opts.UseDracoCompression = doDraco;
 
@@ -68,7 +71,6 @@ namespace GhGltfConverter
 
             // assign the output parameter.
             DA.SetData(0, glTFtext);
-
         }
 
         public string DoConversion(glTFExportOptions options, IEnumerable<RhinoObject> rhinoObjects, Rhino.Render.LinearWorkflow workflow)
