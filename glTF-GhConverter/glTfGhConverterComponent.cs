@@ -66,8 +66,12 @@ namespace GhGltfConverter
 
             glTFExportOptions opts = new glTFExportOptions();
             opts.UseDracoCompression = doDraco;
+            opts.UseDisplayColorForUnsetMaterials = true;
 
             glTFtext = DoConversion(opts, rhinoDoc.Objects, rhinoDoc.RenderSettings.LinearWorkflow);
+
+            rhinoDoc.Objects.Clear();
+            rhinoDoc.Dispose();
 
             // assign the output parameter.
             DA.SetData(0, glTFtext);
@@ -77,6 +81,14 @@ namespace GhGltfConverter
         {
             RhinoDocGltfConverter converter = new RhinoDocGltfConverter(options, false, rhinoObjects, workflow);
             glTFLoader.Schema.Gltf gltf = converter.ConvertToGltf();
+
+            // temporary: modify the material of each object so it reflects a little
+            foreach (glTFLoader.Schema.Material m in gltf.Materials)
+            {
+                m.EmissiveFactor = new float[] { .62F, .32F, .18F };
+                m.PbrMetallicRoughness.MetallicFactor = .5F;
+                m.PbrMetallicRoughness.RoughnessFactor = .5F;
+            }
             return glTFLoader.Interface.SerializeModel(gltf);
         }
 
