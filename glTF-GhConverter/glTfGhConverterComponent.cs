@@ -66,7 +66,7 @@ namespace GhGltfConverter
 
             glTFExportOptions opts = new glTFExportOptions();
             opts.UseDracoCompression = doDraco;
-            opts.UseDisplayColorForUnsetMaterials = true;
+            opts.UseDisplayColorForUnsetMaterials = true;  // if "false" still works here, but fails in Rhino server
 
             glTFtext = DoConversion(opts, rhinoDoc.Objects, rhinoDoc.RenderSettings.LinearWorkflow);
 
