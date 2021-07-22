@@ -16,7 +16,7 @@
     <LangVersion>latestmajor</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="RhinoCommon" Version="7.7.21160.5001" />
+    <PackageReference Include="RhinoCommon" Version="7.8.21196.5001" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\glTFExtensions\glTFExtensions.csproj" />
