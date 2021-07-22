@@ -30,7 +30,8 @@ namespace GhGltfConverter
         {
             pManager.AddMeshParameter("Meshes", "Mesh", "Meshes to be converted", GH_ParamAccess.list);
             pManager.AddIntegerParameter("Material indices", "Idx", "Material index for each mesh", GH_ParamAccess.list, 0);
-            pManager.AddTextParameter("Materials", "Mat", "Materials JSON", GH_ParamAccess.list);
+            pManager.AddTextParameter("Materials", "Mat", "Materials JSON", GH_ParamAccess.list, "");
+            pManager.AddTextParameter("Textures", "Txtur", "Texture filenames", GH_ParamAccess.list, "");
             pManager.AddBooleanParameter("Draco", "Draco", "Draco compression", GH_ParamAccess.item, false);
         }
 
@@ -53,6 +54,7 @@ namespace GhGltfConverter
             List<Mesh> meshes = new List<Mesh>();
             List<int> materialIndices = new List<int>();  // a list, same size as meshes, with the material index for the corresponding mesh
             List<string> materialSpecs = new List<string>();
+            List<string> textureFilenames = new List<string>();
             bool doDraco = true;
 
             // When data cannot be extracted from a parameter, abort.
@@ -71,11 +73,27 @@ namespace GhGltfConverter
                 AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to get material specs");
                 return;
             }
-            if (!DA.GetData(3, ref doDraco))
+            if (!DA.GetDataList(3, textureFilenames))
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to get texture filenames");
+                return;
+            }
+            if (!DA.GetData(4, ref doDraco))
             {
                 AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to get Draco input");
                 return;
             }
+
+            // GH doesn't allow and empty list as a default parameter, so change is back to empty here if the is only one empty string
+            if (materialSpecs.Count == 1 && string.IsNullOrEmpty(materialSpecs[0])) materialSpecs.Clear();
+            if (textureFilenames.Count == 1 && string.IsNullOrEmpty(textureFilenames[0])) textureFilenames.Clear();
+
+            if (textureFilenames.Count != 0 && (textureFilenames.Count != materialSpecs.Count))
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Number of textures and materials must match (or no textures)");
+                return;
+            }
+
 
             // the converter wants a Rhino doc
             RhinoDoc rhinoDoc = RhinoDoc.CreateHeadless(null);
@@ -89,7 +107,7 @@ namespace GhGltfConverter
             rhinoDoc.Objects.Clear();
             rhinoDoc.Dispose();
 
-            SetMaterials(gltf, materialIndices, materialSpecs);
+            SetMaterials(gltf, materialIndices, materialSpecs, textureFilenames);
 
             // assign the output parameter.
             DA.SetData(0, glTFLoader.Interface.SerializeModel(gltf));
@@ -97,54 +115,87 @@ namespace GhGltfConverter
 
         private class InterimMaterialSpec
         {
-            public float[] EmissiveFactor;
+            public float[] BaseColorFactor;
             public float MetallicFactor;
             public float RoughnessFactor;
+            public string TextureFilename;
         };
 
-        private void SetMaterials(glTFLoader.Schema.Gltf gltf, List<int> materialIndices, List<string> materialSpecs)
+        private void SetMaterials(glTFLoader.Schema.Gltf gltf, List<int> materialIndices, List<string> materialSpecs, List<string> textureFilenames)
         {
             // Had hoped to pass in a JSON string to serialize into MaterialSpec's, but JSON currently has a version conflict in Rhino. Maybe it goes away someday
             // For now, the material specs are passed in as strings, each of which contains 5 numeric substrings.
-            // The correspond, in order, to 1,2,3) the RGB values for EmissiveFactor, 4) MetallicFactor, 5) RoughnessFactor.
+            // The correspond, in order, to 1,2,3) the RGB values for BaseColorFactor, 4) MetallicFactor, 5) RoughnessFactor.
             // Thus the following super-kludge loop (this will be one line of code when JSON becomes available.)
             List<InterimMaterialSpec> interimMaterials = new List<InterimMaterialSpec>();
-            foreach (string mString in materialSpecs)
+            for (int i = 0; i < materialSpecs.Count; i++)
             {
+                string mString = materialSpecs[i];
                 List<string> specs = mString.Split(';').ToList();
                 List<float> floats = (from numStr in specs select (float)Convert.ToDouble(numStr)).ToList();
                 InterimMaterialSpec interimMaterial = new InterimMaterialSpec();
-                interimMaterial.EmissiveFactor = new float[] { floats[0], floats[1], floats[2], 1f };
+                interimMaterial.BaseColorFactor = new float[] { floats[0], floats[1], floats[2], 1f };
                 interimMaterial.MetallicFactor = floats[3];
                 interimMaterial.RoughnessFactor = floats[4];
                 interimMaterials.Add(interimMaterial);
+
+                if (textureFilenames.Count > 0) interimMaterial.TextureFilename = textureFilenames[i];  // we've already checked that the lengths match
             }
 
+
+            // Use the interim material specs (simple types from GH) to create glTF objects
             List<glTFLoader.Schema.Material> gltfMaterials = new List<glTFLoader.Schema.Material>();
-            foreach (InterimMaterialSpec im in interimMaterials)
+            List<glTFLoader.Schema.Texture> gltfTextures = new List<glTFLoader.Schema.Texture>();
+            List<glTFLoader.Schema.Image> gltfImages = new List<glTFLoader.Schema.Image>();
+            for (int i = 0; i < interimMaterials.Count; i++)
             {
+                InterimMaterialSpec im = interimMaterials[i];
                 glTFLoader.Schema.Material mat = new glTFLoader.Schema.Material();
-                //mat.EmissiveFactor = im.EmissiveFactor;
                 mat.PbrMetallicRoughness = new glTFLoader.Schema.MaterialPbrMetallicRoughness();
+                if (string.IsNullOrEmpty(im.TextureFilename)) mat.PbrMetallicRoughness.BaseColorFactor = im.BaseColorFactor;
                 mat.PbrMetallicRoughness.MetallicFactor = im.MetallicFactor;
                 mat.PbrMetallicRoughness.RoughnessFactor = im.RoughnessFactor;
-                mat.PbrMetallicRoughness.BaseColorFactor = im.EmissiveFactor;
+
+                if (!string.IsNullOrEmpty(im.TextureFilename))  // create the required texture objects to go along with this material
+                {
+                    // Texture object
+                    glTFLoader.Schema.Texture texture = new glTFLoader.Schema.Texture();
+                    texture.Source = i;  // this is the image # (created below)
+                    texture.Sampler = 0;  // using the default Sampler provided by the converter
+                    gltfTextures.Add(texture);
+
+                    // Image object
+                    glTFLoader.Schema.Image image = new glTFLoader.Schema.Image();
+                    image.Uri = im.TextureFilename;
+                    gltfImages.Add(image);
+
+                    // set the BaseColorTexture of this Material point to the new Texture
+                    glTFLoader.Schema.TextureInfo textureInfo = new glTFLoader.Schema.TextureInfo();
+                    textureInfo.Index = i;  // the Texture just created, which points to the Image just created
+
+                    mat.PbrMetallicRoughness.BaseColorTexture = textureInfo;
+                }
 
                 gltfMaterials.Add(mat);
             }
 
-            int idx = 0;
-            int numMeshes = gltf.Meshes.Length;
-            int numFaces = numMeshes * 2 / 3;
-            foreach (glTFLoader.Schema.Mesh mesh in gltf.Meshes)
+            if (gltfMaterials.Count > 0)
             {
-                mesh.Primitives[0].Material = idx < numFaces ? 0 : 1;
-                idx++;
+                gltf.Materials = gltfMaterials.ToArray();
+                if (gltfTextures.Count > 0) gltf.Textures = gltfTextures.ToArray();
+                if (gltfImages.Count > 0) gltf.Images = gltfImages.ToArray();
+                // need Samplers also, but using the default Sampler for now
+
+                // Assign the appropriate Material to each Mesh
+                // Using a kludge for now, knowing that 2/3's of the Meshes are Faces and the other 1/3 are Edges
+                int numMeshes = gltf.Meshes.Length;
+                int numFaces = numMeshes * 2 / 3;
+                for (int i = 0; i < gltf.Meshes.Length; i++)
+                {
+                    glTFLoader.Schema.Mesh mesh = gltf.Meshes[i];
+                    mesh.Primitives[0].Material = i < numFaces ? 0 : 1;
+                }
             }
-
-            gltf.Materials = gltfMaterials.ToArray();
-
-
         }
 
         public glTFLoader.Schema.Gltf DoConversion(glTFExportOptions options, IEnumerable<RhinoObject> rhinoObjects, Rhino.Render.LinearWorkflow workflow)
@@ -155,7 +206,7 @@ namespace GhGltfConverter
             // temporary: modify the material of each object so it reflects a little
             //foreach (glTFLoader.Schema.Material m in gltf.Materials)
             //{
-            //    m.EmissiveFactor = new float[] { .62F, .32F, .18F };
+            //    m.BaseColorFactor = new float[] { .62F, .32F, .18F };
             //    m.PbrMetallicRoughness.MetallicFactor = .5F;
             //    m.PbrMetallicRoughness.RoughnessFactor = .5F;
             //}
@@ -163,13 +214,13 @@ namespace GhGltfConverter
             //JsonConvert.DeserializeObject
 
             //glTFLoader.Schema.Material mat1 = new glTFLoader.Schema.Material();
-            //mat1.EmissiveFactor = new float[] { .99F, .05F, .05F };
+            //mat1.BaseColorFactor = new float[] { .99F, .05F, .05F };
             //mat1.PbrMetallicRoughness = new glTFLoader.Schema.MaterialPbrMetallicRoughness();
             //mat1.PbrMetallicRoughness.MetallicFactor = .5F;
             //mat1.PbrMetallicRoughness.RoughnessFactor = .5F;
 
             //glTFLoader.Schema.Material mat2 = new glTFLoader.Schema.Material();
-            //mat2.EmissiveFactor = new float[] { .05F, .99F, .05F };
+            //mat2.BaseColorFactor = new float[] { .05F, .99F, .05F };
             //mat2.PbrMetallicRoughness = new glTFLoader.Schema.MaterialPbrMetallicRoughness();
             //mat2.PbrMetallicRoughness.MetallicFactor = .5F;
             //mat2.PbrMetallicRoughness.RoughnessFactor = .5F;
