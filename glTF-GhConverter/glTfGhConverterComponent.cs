@@ -193,52 +193,27 @@ namespace GhGltfConverter
                 for (int i = 0; i < gltf.Meshes.Length; i++)
                 {
                     glTFLoader.Schema.Mesh mesh = gltf.Meshes[i];
-                    mesh.Primitives[0].Material = i < numFaces ? 0 : 1;
+                    if (materialIndices.Count == 1)
+                    {
+                        mesh.Primitives[0].Material = materialIndices[0];
+                    }
+                    else
+                    {
+                        mesh.Primitives[0].Material = i < numFaces ? 0 : 1;
+                    }
                 }
             }
+
+            // set the default (and only) sampler to do a mirrored repeat
+            glTFLoader.Schema.Sampler sampler = gltf.Samplers[0];
+            sampler.WrapS = glTFLoader.Schema.Sampler.WrapSEnum.MIRRORED_REPEAT;
+            sampler.WrapT = glTFLoader.Schema.Sampler.WrapTEnum.MIRRORED_REPEAT;
         }
 
         public glTFLoader.Schema.Gltf DoConversion(glTFExportOptions options, IEnumerable<RhinoObject> rhinoObjects, Rhino.Render.LinearWorkflow workflow)
         {
             RhinoDocGltfConverter converter = new RhinoDocGltfConverter(options, false, rhinoObjects, workflow);
             return converter.ConvertToGltf();
-
-            // temporary: modify the material of each object so it reflects a little
-            //foreach (glTFLoader.Schema.Material m in gltf.Materials)
-            //{
-            //    m.BaseColorFactor = new float[] { .62F, .32F, .18F };
-            //    m.PbrMetallicRoughness.MetallicFactor = .5F;
-            //    m.PbrMetallicRoughness.RoughnessFactor = .5F;
-            //}
-
-            //JsonConvert.DeserializeObject
-
-            //glTFLoader.Schema.Material mat1 = new glTFLoader.Schema.Material();
-            //mat1.BaseColorFactor = new float[] { .99F, .05F, .05F };
-            //mat1.PbrMetallicRoughness = new glTFLoader.Schema.MaterialPbrMetallicRoughness();
-            //mat1.PbrMetallicRoughness.MetallicFactor = .5F;
-            //mat1.PbrMetallicRoughness.RoughnessFactor = .5F;
-
-            //glTFLoader.Schema.Material mat2 = new glTFLoader.Schema.Material();
-            //mat2.BaseColorFactor = new float[] { .05F, .99F, .05F };
-            //mat2.PbrMetallicRoughness = new glTFLoader.Schema.MaterialPbrMetallicRoughness();
-            //mat2.PbrMetallicRoughness.MetallicFactor = .5F;
-            //mat2.PbrMetallicRoughness.RoughnessFactor = .5F;
-
-            //gltf.Materials = new glTFLoader.Schema.Material[] { mat1, mat2 };
-            //int idx = 0;
-            //int numMeshes = gltf.Meshes.Length;
-            //int numFaces = numMeshes * 2 / 3;
-            //foreach (glTFLoader.Schema.Mesh mesh in gltf.Meshes)
-            //{
-            //    mesh.Primitives[0].Material = idx < numFaces ? 0 : 1;
-            //    idx++;
-            //}
-
-            //return glTFLoader.Interface.SerializeModel(gltf);
-
-
-
         }
 
         /// <summary>
