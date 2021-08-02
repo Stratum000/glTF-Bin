@@ -61,6 +61,9 @@ namespace GhGltfConverter
                 AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to get Meshes input");
                 return;
             }
+
+            meshes.Reverse();  // It seems like this list is reversed upon GetDataList, while the other lists are not ??
+
             if (!DA.GetDataList(1, materialIndices))
             {
                 AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to get material indices");
@@ -173,28 +176,19 @@ namespace GhGltfConverter
                 gltf.Materials = gltfMaterials.ToArray();
                 if (gltfTextures.Count > 0) gltf.Textures = gltfTextures.ToArray();
                 if (gltfImages.Count > 0) gltf.Images = gltfImages.ToArray();
-                // need Samplers also, but using the default Sampler for now
+                // using only the default Sampler
 
-                // Assign the appropriate Material to each Mesh
-                // Using a kludge for now, knowing that 2/3's of the Meshes are Faces and the other 1/3 are Edges
-                int numMeshes = gltf.Meshes.Length;
-                int numFaces = numMeshes * 2 / 3;
+                // Assign the appropriate Material to each Mesh using the materialIndices passed in
                 for (int i = 0; i < gltf.Meshes.Length; i++)
                 {
                     glTFLoader.Schema.Mesh mesh = gltf.Meshes[i];
-                    if (materialIndices.Count == 1)
-                    {
-                        mesh.Primitives[0].Material = materialIndices[0];
-                    }
-                    else
-                    {
-                        mesh.Primitives[0].Material = i < numFaces ? 0 : 1;
-                    }
+                    mesh.Primitives[0].Material = materialIndices.Count == 1 ? materialIndices[0] : materialIndices[i];
                 }
             }
 
             // set the default (and only) sampler to do a mirrored repeat in both directions
             glTFLoader.Schema.Sampler sampler = gltf.Samplers[0];
+            // TODO: make the repeat-type an input parameter if we want simple REPEAT in the future
             sampler.WrapS = glTFLoader.Schema.Sampler.WrapSEnum.MIRRORED_REPEAT;
             sampler.WrapT = glTFLoader.Schema.Sampler.WrapTEnum.MIRRORED_REPEAT;
         }
