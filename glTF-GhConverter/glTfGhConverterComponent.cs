@@ -31,7 +31,6 @@ namespace GhGltfConverter
             pManager.AddMeshParameter("Meshes", "Mesh", "Meshes to be converted", GH_ParamAccess.list);
             pManager.AddIntegerParameter("Material indices", "Idx", "Material index for each mesh", GH_ParamAccess.list, 0);
             pManager.AddTextParameter("Materials", "Mat", "Materials JSON", GH_ParamAccess.list, "");
-            pManager.AddTextParameter("Textures", "Txtur", "Texture filenames", GH_ParamAccess.list, "");
             pManager.AddBooleanParameter("Draco", "Draco", "Draco compression", GH_ParamAccess.item, false);
         }
 
@@ -54,7 +53,6 @@ namespace GhGltfConverter
             List<Mesh> meshes = new List<Mesh>();
             List<int> materialIndices = new List<int>();  // a list, same size as meshes, with the material index for the corresponding mesh
             List<string> materialSpecs = new List<string>();
-            List<string> textureFilenames = new List<string>();
             bool doDraco = true;
 
             // When data cannot be extracted from a parameter, abort.
@@ -73,26 +71,14 @@ namespace GhGltfConverter
                 AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to get material specs");
                 return;
             }
-            if (!DA.GetDataList(3, textureFilenames))
-            {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to get texture filenames");
-                return;
-            }
-            if (!DA.GetData(4, ref doDraco))
+            if (!DA.GetData(3, ref doDraco))
             {
                 AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Unable to get Draco input");
                 return;
             }
 
-            // GH doesn't allow and empty list as a default parameter, so change is back to empty here if the is only one empty string
+            // GH doesn't allow and empty list as a default parameter, so change it back to empty here if the is only one empty string
             if (materialSpecs.Count == 1 && string.IsNullOrEmpty(materialSpecs[0])) materialSpecs.Clear();
-            if (textureFilenames.Count == 1 && string.IsNullOrEmpty(textureFilenames[0])) textureFilenames.Clear();
-
-            if (textureFilenames.Count != 0 && (textureFilenames.Count != materialSpecs.Count))
-            {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Number of textures and materials must match (or no textures)");
-                return;
-            }
 
 
             // the converter wants a Rhino doc
@@ -107,7 +93,7 @@ namespace GhGltfConverter
             rhinoDoc.Objects.Clear();
             rhinoDoc.Dispose();
 
-            SetMaterials(gltf, materialIndices, materialSpecs, textureFilenames);
+            SetMaterials(gltf, materialIndices, materialSpecs);
 
             // assign the output parameter.
             DA.SetData(0, glTFLoader.Interface.SerializeModel(gltf));
@@ -121,25 +107,28 @@ namespace GhGltfConverter
             public string TextureFilename;
         };
 
-        private void SetMaterials(glTFLoader.Schema.Gltf gltf, List<int> materialIndices, List<string> materialSpecs, List<string> textureFilenames)
+        private void SetMaterials(glTFLoader.Schema.Gltf gltf, List<int> materialIndices, List<string> materialSpecs)
         {
-            // Had hoped to pass in a JSON string to serialize into MaterialSpec's, but JSON currently has a version conflict in Rhino. Maybe it goes away someday
-            // For now, the material specs are passed in as strings, each of which contains 5 numeric substrings.
-            // The correspond, in order, to 1,2,3) the RGB values for BaseColorFactor, 4) MetallicFactor, 5) RoughnessFactor.
+            // Had hoped to pass in a JSON string to serialize into MaterialSpec's, but JSON currently has a version conflict in Rhino.
+            // Maybe it goes away someday.
+            // For now, the material specs are passed in as strings, each of which contains a precise number of substrings, separated by semi-colons.
+            // The material spec string corresponds, in order, to:
+            // 0,1,2) the RGB values for BaseColorFactor, 3) the alpha value for the color,
+            // 4) MetallicFactor, 5) RoughnessFactor,
+            // 6) the Texture filename (or empty string)
             // Thus the following super-kludge loop (this will be one line of code when JSON becomes available.)
             List<InterimMaterialSpec> interimMaterials = new List<InterimMaterialSpec>();
             for (int i = 0; i < materialSpecs.Count; i++)
             {
                 string mString = materialSpecs[i];
                 List<string> specs = mString.Split(';').ToList();
-                List<float> floats = (from numStr in specs select (float)Convert.ToDouble(numStr)).ToList();
+                List<float> floats = (from numStr in specs.Take(6) select (float)Convert.ToDouble(numStr)).ToList();  // the first 6 values are floats
                 InterimMaterialSpec interimMaterial = new InterimMaterialSpec();
-                interimMaterial.BaseColorFactor = new float[] { floats[0], floats[1], floats[2], 1f };
-                interimMaterial.MetallicFactor = floats[3];
-                interimMaterial.RoughnessFactor = floats[4];
+                interimMaterial.BaseColorFactor = new float[] { floats[0], floats[1], floats[2], floats[3] };
+                interimMaterial.MetallicFactor = floats[4];
+                interimMaterial.RoughnessFactor = floats[5];
+                interimMaterial.TextureFilename = specs.Count > 6 ? specs[6] : "";  // a string
                 interimMaterials.Add(interimMaterial);
-
-                if (textureFilenames.Count > 0) interimMaterial.TextureFilename = textureFilenames[i];  // we've already checked that the lengths match
             }
 
 
@@ -204,7 +193,7 @@ namespace GhGltfConverter
                 }
             }
 
-            // set the default (and only) sampler to do a mirrored repeat
+            // set the default (and only) sampler to do a mirrored repeat in both directions
             glTFLoader.Schema.Sampler sampler = gltf.Samplers[0];
             sampler.WrapS = glTFLoader.Schema.Sampler.WrapSEnum.MIRRORED_REPEAT;
             sampler.WrapT = glTFLoader.Schema.Sampler.WrapTEnum.MIRRORED_REPEAT;
