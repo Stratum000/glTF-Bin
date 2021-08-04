@@ -92,6 +92,8 @@ namespace GhGltfConverter
             opts.UseDracoCompression = doDraco;
             opts.UseDisplayColorForUnsetMaterials = true;  // if "false" still works here, but fails in Rhino server
 
+
+            // ******  Do the Conversion
             glTFLoader.Schema.Gltf gltf = DoConversion(opts, rhinoDoc.Objects, rhinoDoc.RenderSettings.LinearWorkflow);
             rhinoDoc.Objects.Clear();
             rhinoDoc.Dispose();
@@ -100,6 +102,12 @@ namespace GhGltfConverter
 
             // assign the output parameter.
             DA.SetData(0, glTFLoader.Interface.SerializeModel(gltf));
+        }
+
+        public glTFLoader.Schema.Gltf DoConversion(glTFExportOptions options, IEnumerable<RhinoObject> rhinoObjects, Rhino.Render.LinearWorkflow workflow)
+        {
+            RhinoDocGltfConverter converter = new RhinoDocGltfConverter(options, false, rhinoObjects, workflow);
+            return converter.ConvertToGltf();
         }
 
         private class InterimMaterialSpec
@@ -191,12 +199,6 @@ namespace GhGltfConverter
             // TODO: make the repeat-type an input parameter if we want simple REPEAT in the future
             sampler.WrapS = glTFLoader.Schema.Sampler.WrapSEnum.MIRRORED_REPEAT;
             sampler.WrapT = glTFLoader.Schema.Sampler.WrapTEnum.MIRRORED_REPEAT;
-        }
-
-        public glTFLoader.Schema.Gltf DoConversion(glTFExportOptions options, IEnumerable<RhinoObject> rhinoObjects, Rhino.Render.LinearWorkflow workflow)
-        {
-            RhinoDocGltfConverter converter = new RhinoDocGltfConverter(options, false, rhinoObjects, workflow);
-            return converter.ConvertToGltf();
         }
 
         /// <summary>
