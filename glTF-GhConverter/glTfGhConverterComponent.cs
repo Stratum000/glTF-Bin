@@ -13,6 +13,7 @@ using System.Linq;
 
 namespace GhGltfConverter
 {
+    // Stratum customization
     public class glTfGhConverterComponent : GH_Component
     {
         /// <summary>
@@ -80,7 +81,7 @@ namespace GhGltfConverter
                 return;
             }
 
-            // GH doesn't allow and empty list as a default parameter, so change it back to empty here if the is only one empty string
+            // GH doesn't allow an empty list as a default parameter, so change it back to empty here if there is only one empty string
             if (materialSpecs.Count == 1 && string.IsNullOrEmpty(materialSpecs[0])) materialSpecs.Clear();
 
 
@@ -90,7 +91,7 @@ namespace GhGltfConverter
 
             glTFExportOptions opts = new glTFExportOptions();
             opts.UseDracoCompression = doDraco;
-            opts.UseDisplayColorForUnsetMaterials = true;  // if "false" still works here, but fails in Rhino server
+            opts.UseDisplayColorForUnsetMaterials = true;  // if "false" still works locally, but fails in Rhino server
 
 
             // ******  Do the Conversion
@@ -147,6 +148,7 @@ namespace GhGltfConverter
             List<glTFLoader.Schema.Material> gltfMaterials = new List<glTFLoader.Schema.Material>();
             List<glTFLoader.Schema.Texture> gltfTextures = new List<glTFLoader.Schema.Texture>();
             List<glTFLoader.Schema.Image> gltfImages = new List<glTFLoader.Schema.Image>();
+            int nTextureMaterials = 0; // keep track of the indices for texture materials.
             for (int i = 0; i < interimMaterials.Count; i++)
             {
                 InterimMaterialSpec im = interimMaterials[i];
@@ -160,7 +162,7 @@ namespace GhGltfConverter
                 {
                     // Texture object
                     glTFLoader.Schema.Texture texture = new glTFLoader.Schema.Texture();
-                    texture.Source = i;  // this is the image # (created below)
+                    texture.Source = nTextureMaterials;  // this is the image # (created below)
                     texture.Sampler = 0;  // using the default Sampler provided by the converter
                     gltfTextures.Add(texture);
 
@@ -171,9 +173,10 @@ namespace GhGltfConverter
 
                     // set the BaseColorTexture of this Material point to the new Texture
                     glTFLoader.Schema.TextureInfo textureInfo = new glTFLoader.Schema.TextureInfo();
-                    textureInfo.Index = i;  // the Texture just created, which points to the Image just created
+                    textureInfo.Index = nTextureMaterials;  // the Texture just created, which points to the Image just created
 
                     mat.PbrMetallicRoughness.BaseColorTexture = textureInfo;
+                    nTextureMaterials++;
                 }
 
                 gltfMaterials.Add(mat);
