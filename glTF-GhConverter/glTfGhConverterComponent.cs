@@ -178,6 +178,20 @@ namespace GhGltfConverter
                     mat.PbrMetallicRoughness.BaseColorTexture = textureInfo;
                     nTextureMaterials++;
                 }
+                //else if (im.MetallicFactor == 0f) // kludge, if metalness is 0, set to full emissive
+                //{
+                //    // Texture object
+                //    glTFLoader.Schema.Texture texture = new glTFLoader.Schema.Texture();
+                //    texture.Source = nTextureMaterials;  // this is the emissive # (created below)
+                //    texture.Sampler = 0;  // using the default Sampler provided by the converter
+                //    gltfTextures.Add(texture);
+
+                //    glTFLoader.Schema.TextureInfo textureInfo = new glTFLoader.Schema.TextureInfo();
+                //    textureInfo.Index = nTextureMaterials;  // the Texture just created, which is a solid color material
+                //    mat.PbrMetallicRoughness.BaseColorTexture = 
+                //    mat.EmissiveTexture = textureInfo;
+                //    nTextureMaterials++;
+                //}
 
                 gltfMaterials.Add(mat);
             }
